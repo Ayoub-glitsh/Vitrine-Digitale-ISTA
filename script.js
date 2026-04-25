@@ -115,82 +115,76 @@
   }
 
   const modalBody = document.querySelector('.modal-body');
-  let   scrollTimer    = null;
-  let   scrollRaf      = null;
-  let   scrollPaused   = false;
-  let   scrollProgress = 0;   // 0..1, where we are in the scroll
-  let   scrollDuration = 0;   // total duration for current scroll
-  let   scrollMaxPx    = 0;   // max scrollable px for current tab
-  let   scrollStart    = null; // performance.now() when scroll last resumed
+  let scrollRaf      = null;
+  let scrollTimer    = null;
+  let scrollPaused   = false;
+  let scrollActive   = false;
+  let scrollFromPx   = 0;
+  let scrollToPx     = 0;
+  let scrollSegDur   = 0;
+  let scrollSegStart = null; // performance.now() when current segment started
+
+  function scrollStep(now) {
+    if (!scrollActive || scrollPaused) return;
+    const elapsed = now - scrollSegStart;
+    const frac    = Math.min(elapsed / scrollSegDur, 1);
+    const ease    = frac < 0.5 ? 2 * frac * frac : -1 + (4 - 2 * frac) * frac;
+    modalBody.scrollTop = scrollFromPx + ease * (scrollToPx - scrollFromPx);
+    if (frac < 1) {
+      scrollRaf = requestAnimationFrame(scrollStep);
+    } else {
+      scrollActive   = false;
+      scrollSegStart = null;
+    }
+  }
 
   function stopAutoScroll() {
     clearTimeout(scrollTimer);
     cancelAnimationFrame(scrollRaf);
-    scrollTimer = null;
-    scrollRaf   = null;
+    scrollTimer    = null;
+    scrollRaf      = null;
+    scrollActive   = false;
+    scrollPaused   = false;
+    scrollSegStart = null;
   }
 
   function pauseScroll() {
-    if (scrollPaused) return;
+    if (!scrollActive || scrollPaused || scrollSegStart === null) return;
     scrollPaused = true;
     cancelAnimationFrame(scrollRaf);
     scrollRaf = null;
-    // save how far we got
-    if (scrollStart !== null && scrollDuration > 0) {
-      const elapsed = performance.now() - scrollStart;
-      scrollProgress = Math.min(scrollProgress + elapsed / scrollDuration, 1);
-      scrollDuration = scrollDuration * (1 - (scrollProgress - (scrollProgress - elapsed / scrollDuration)));
-    }
+    // save current px as new start, shrink remaining duration
+    const elapsed  = performance.now() - scrollSegStart;
+    const done     = Math.min(elapsed / scrollSegDur, 1);
+    scrollFromPx   = modalBody.scrollTop;          // exact current position
+    scrollSegDur   = scrollSegDur * (1 - done);    // only remaining time
+    scrollSegStart = null;
   }
 
   function resumeScroll() {
-    if (!scrollPaused) return;
-    scrollPaused = false;
-    if (scrollDuration <= 0 || scrollProgress >= 1) return;
-    const remaining = scrollDuration * (1 - scrollProgress);
-    const startPx   = modalBody.scrollTop;
-    scrollStart      = performance.now();
-
-    function step(now) {
-      const elapsed  = now - scrollStart;
-      const frac     = Math.min(elapsed / remaining, 1);
-      const ease     = frac < 0.5 ? 2 * frac * frac : -1 + (4 - 2 * frac) * frac;
-      modalBody.scrollTop = startPx + ease * (scrollMaxPx - startPx);
-      if (frac < 1) scrollRaf = requestAnimationFrame(step);
-      else scrollProgress = 1;
-    }
-    scrollRaf = requestAnimationFrame(step);
+    if (!scrollPaused || !scrollActive) return;
+    scrollPaused   = false;
+    if (scrollSegDur <= 0 || scrollFromPx >= scrollToPx) return;
+    scrollSegStart = performance.now();             // fresh start from current px
+    scrollRaf      = requestAnimationFrame(scrollStep);
   }
 
   function autoScrollBody(duration, delay = 0) {
     stopAutoScroll();
-    scrollProgress = 0;
-    scrollDuration = duration;
-    scrollPaused   = false;
 
     requestAnimationFrame(() => {
-      const el = modalBody;
-      scrollMaxPx = el.scrollHeight - el.clientHeight;
-      if (scrollMaxPx <= 0) return;
+      const maxScroll = modalBody.scrollHeight - modalBody.clientHeight;
+      if (maxScroll <= 0) return;
 
-      el.scrollTop = 0;
+      modalBody.scrollTop = 0;
+      scrollFromPx = 0;
+      scrollToPx   = maxScroll;
+      scrollSegDur = duration;
+      scrollActive = true;
 
       scrollTimer = setTimeout(() => {
-        scrollStart = performance.now();
-
-        function step(now) {
-          if (scrollPaused) return;
-          const elapsed  = now - scrollStart;
-          const progress = Math.min(elapsed / duration, 1);
-          const ease     = progress < 0.5
-            ? 2 * progress * progress
-            : -1 + (4 - 2 * progress) * progress;
-          el.scrollTop   = ease * scrollMaxPx;
-          scrollProgress = progress;
-          if (progress < 1) scrollRaf = requestAnimationFrame(step);
-        }
-
-        scrollRaf = requestAnimationFrame(step);
+        scrollSegStart = performance.now();
+        scrollRaf = requestAnimationFrame(scrollStep);
       }, delay);
     });
   }

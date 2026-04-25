@@ -937,8 +937,8 @@ html, body {
 
 .tech-badge.html { background: rgba(227, 76, 38, 0.1); border: 1px solid rgba(227, 76, 38, 0.25); }
 .tech-badge.js   { background: rgba(247, 223, 30, 0.1); border: 1px solid rgba(247, 223, 30, 0.25); }
-.tech-badge.php  { background: rgba(136, 146, 191, 0.1); border: 1px solid rgba(136, 146, 191, 0.25); }
-.tech-badge.mysql { background: rgba(0, 117, 143, 0.1); border: 1px solid rgba(0, 117, 143, 0.25); }
+.tech-badge.php  { background: transparent; border: 1px solid rgba(136, 146, 191, 0.25); padding: 6px; }
+.tech-badge.mysql { background: transparent; border: 1px solid rgba(0, 117, 143, 0.25); padding: 6px; }
 .tech-badge.responsive { background: rgba(26, 159, 212, 0.1); border: 1px solid rgba(26, 159, 212, 0.25); }
 
 .tech-item strong {
